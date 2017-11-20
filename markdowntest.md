@@ -5,6 +5,7 @@ git add READ.md
 git commit -m "first commit"
 git remote add origin http://github.com/ShadowDebris/Base.git
 git push -u origin master
+git remote rm origin
 ```
 #老仓库推送
 ```{}
