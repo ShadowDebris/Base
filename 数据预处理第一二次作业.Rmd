@@ -1,0 +1,178 @@
+---
+title: "数据预处理第一、二次作业"
+author: "甘鹏程"
+date: "2017年10月30日"
+output: html_document
+---
+## homework1
+
+####*1. 各国汇率数据整理*
+```{r echo=TRUE}
+library(quantmod)
+library(zoo)
+library(xts)
+library(MASS)
+library(foreign)
+library(stringr)
+library(plyr)
+library(reshape2)
+library(ggplot2)
+library(dplyr)
+library(nycflights13)
+library(lubridate) 
+y=read.table("http://www.webmasterhome.cn/huilv/huobidaima.asp",header=TRUE,sep=",")
+abb <- y[60:232,]
+abb <- as.character(abb)
+filedabb =strsplit(abb,split="/")
+abc <- 1
+for (i in 1:173){ abc[i] = filedabb[[i]][3]}
+abc <- as.vector(abc)
+abc <- paste('USD',abc,sep = '/')
+abc0 <- abc[!(abc %in% c("USD/CLF","USD/MXV","USD/XCP","USD/XDR"))]
+for(j in 1:172){
+  getFX(abc0[j])
+  if (j %% 20 == 0) {Sys.sleep(5)}
+  else {Sys.sleep(1)}
+}
+file = (ls(pattern = "USD"))
+a <- get(file[1])
+a <- as.matrix(a)
+change <- function(x){
+  b <- get(x)
+  b <- as.matrix(b)
+}
+rate <- lapply(file,change)
+exrate=matrix(unlist(rate),ncol =length(rate))
+rownames(exrate) <- rownames(a)
+colnames(exrate) <- abc0
+dim(exrate)
+exrate[1:10,1:8]
+```
+
+>首先从网站下载世界货币代码表，并将需要代码字段进行整理成为USD/XX格式，构建
+循环函数依次获取各国货币对于美元的汇率数据，最后转化为矩阵格式。
+
+####*2. 联合国救助数据整理*
+```{r}
+download.file(url="http://jaredlander.com/data/US_Foreign_Aid.zip",
+              destfile="ForeignAid.zip")
+unzip("ForeignAid.zip")
+library(stringr)
+theFiles=dir(pattern = "^US_Foreign_Aid")
+for (a in theFiles)
+{
+  nameToUse=str_sub(string=a,start=12,end=18)
+  temp=read.table(a,header=TRUE,sep=",",stringsAsFactors=FALSE)
+  assign(x=nameToUse,value=temp)
+}
+frameNames=str_sub(string=theFiles, start=12, end=18)
+frameList=vector("list",length(frameNames))
+names(frameList)=frameNames
+for (a in frameNames) frameList[[a]]=get(a)
+allAid=frameList[[1]]
+for (a in frameNames[-1])
+  allAid=join(allAid,frameList[[a]],by=c("Country.Name","Program.Name"))
+allAid_tidy <- melt(data = allAid,
+                    id.vars = c("Program.Name","Country.Name"),
+                    na.rm = TRUE,
+                    variable.name  = "year",
+                    value.name = "qty"
+                    )
+allAid_tidy$year <- as.integer(str_replace(allAid_tidy$year, "FY", ""))
+allAid_tidy <- arrange(allAid_tidy,Program.Name,Country.Name,year)
+head(allAid_tidy)
+```
+
+>利用get函数分别获取每个年龄段文件数据，然后利用join函数将各个单独的数据集
+汇总到一起，再利用melt函数转化为tidy数据。
+
+## homework2
+####*1. 对比数据集flights中的变量dep_time,sched_dep_time,dep_delay是否一致*
+```{r}
+make_datetime_100 <- function(year, month, day, time)
+{
+  make_datetime(year, month, day, time %/% 100, time %% 100)
+}
+flights_dt <- 
+  flights %>% 
+  filter(!is.na(dep_time), !is.na(sched_dep_time),!is.na(dep_delay)) %>% 
+  mutate(
+    dep_time = make_datetime_100(year, month, day, dep_time), 
+    sched_dep_time = make_datetime_100(year, month, day, sched_dep_time), 
+    sched_arr_time = make_datetime_100( year, month, day, sched_arr_time),
+    arr_time = make_datetime_100( year, month, day, arr_time),
+    air_time = make_datetime_100( year, month, day, air_time)) %>%
+  select(origin, dest, ends_with("delay"), ends_with("time"))
+flights_dt$raw_dep <- (flights_dt$dep_time - flights_dt$sched_dep_time)/60
+flights_dt$cat <- flights_dt$dep_delay-flights_dt$raw_dep
+sum(flights_dt$cat!=0)#对比三个变量是否相互对应
+sum(flights_dt$cat[flights_dt$cat!=1440]!=0)#有部分延迟时间的计算没有参考日期值的变化，即计算的两个时间点不在同一天，故计算延误与实际延误出现了1440min（即24h）的差额
+```
+
+>首先观察数据集取值情况，针对时间的储存格式进行修改，构建函数make_datetime_100将时间点按标准格式表示。然后再计算离开时间与预计离开时间的差值是否等于给定的延误时间，发现存在1207个不对应值，原因是参考计算的两个时间点不在同一天而出现了不等值，纠正二者之间*1440mn（24h）的差额*后是对应的。
+
+####*2. 一天中不同时间点的平均延误时间是什么*
+```{r}
+flights_dt %>%
+  mutate(hour =  hour(dep_time)) %>% 
+  group_by(hour) %>%
+  dplyr::summarize(
+    avg_delay = mean(arr_delay, na.rm = TRUE),
+    n = n()) %>%
+  ggplot(aes(hour,avg_delay))+geom_line(colour="red")+xlab("一天中不同时间点")+ylab("平均延误市场/分钟")
+```
+
+>以一天中24各个小时为时间点，计算每个出发时间为基准的时间点内的平均到达延误
+时长，从线图中可以看到一天24小时平均延误时间的变化。
+
+####*3. 一周中哪天飞机延误的概率最低*
+```{r}
+flights_dt %>%
+  mutate(wday =  wday(dep_time,label = T)) %>%
+  group_by(wday) %>%
+  dplyr::summarize(
+    poss = sum(arr_delay > 0, na.rm = TRUE)/sum(!is.na(arr_delay)),
+    n = n()) %>%
+  ggplot(aes(wday, poss,fill=wday)) + geom_bar(stat = "identity")+xlab("星期中不同天数")+ylab("延误概率")
+```
+
+>以一周七天为时间点，计算每个出发时间为基准的周时间点内的平均到达延误时间
+大于0的比率，即延误概率。从条形图中可以对比一周中每天的飞机延误概率。最高的周四，最低的是周六。
+
+####*4. 在地图上显示各个机场的延误情况*
+```{r}
+names(airports)
+names(flights)    
+library(plyr)
+names(airports) <- c("dest","name","lat","lon","alt")
+library(maps)
+states <- map_data("state")
+gg <- flights %>%
+  group_by(dest) %>%
+  dplyr::summarize(
+    avg_delay = mean(arr_delay, na.rm = TRUE),
+    n = n()) 
+Allgg=join(x=gg,y=airports[,1:4],
+                by=c("dest"))
+Allgg <- na.omit(Allgg)
+p <- ggplot()+geom_polygon(data = states,mapping = aes(long,lat,group=group),fill='white',color='black')
+p + geom_point(mapping = aes(x=lon,y = lat,size=avg_delay,color=avg_delay),data = Allgg)+xlab("经度")+ylab("纬度")
+```
+
+>根据flights和airports数据集的交集字段，将已经计算不同飞机场平均延误时间
+的gg数据集与airports中的经纬度数据链接起来。在ggplot中绘制地图，根据圆点
+的大小和颜色深浅可以观察该机场平均延误情况。
+
+####*5. 飞机的使用寿命和延误情况*
+```{r}
+cost=join(x=flights[,-1],y=planes,
+           by=c("tailnum"))
+cost <- na.omit(cost)
+cost2 <- cost %>%
+  mutate(life = year(time_hour)-year)
+cost2$life <- as.factor(cost2$life)
+ggplot(data=cost2,aes(x=life,y=arr_delay,color=life))+geom_boxplot()+stat_summary(fun.y = "mean",geom = "point",shape=23,size=2,fill='white')+xlab("飞机寿命") + ylab("延误时间")+ ggtitle("飞机寿命与延误时间箱线图")
+ggplot(data=cost2,aes(x=life,y=arr_delay,color=life))+geom_point()+xlab("飞机寿命") + ylab("延误时间") + ggtitle("飞机寿命与延误时间散点图")
+```
+
+>根据共同字段tailnum，将flights数据集与planes数据集链接，并计算相应飞机寿命，以飞机寿命为横轴绘制与平均延误时间的箱线图和散点图。根据散点图和箱线图得到的分布情况，飞机服役寿命与延误时间之前没有明显的相关关系。

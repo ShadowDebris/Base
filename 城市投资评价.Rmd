@@ -1,0 +1,145 @@
+---
+title: "城市投资潜力分析"
+author: "S.st"
+date: "2017年9月23日"
+output: html_document
+---
+
+
+
+##读取数据
+
+
+```{r}
+library(corrplot)
+citydat0 = read.csv("城市投资潜力.csv", header = T) #读取数据
+head(citydat0) # 显示数据的前几个观测值
+```
+
+
+
+##描述分析
+
+
+```{r}
+summary(citydat0[,-c(1)]) #计算所有变量的基本统计值
+```
+#描述分析统计图
+
+```{r}
+opar <- par(no.readonly=T) #设置绘图参数
+par(mfrow=c(2,4))  #绘制统计图
+hist(citydat0$GDP,col = "tomato",xlab = "GdP",ylab = "频数",main = "城市GDP")
+hist(citydat0$人均可支配收入,col ="goldenrod",xlab = "收入额",ylab = "频数",main = "人均可支配收入")
+hist(citydat0$城市化水平,col ="khaki2",xlab = "水平值",ylab = "频数",main = "城市化水平")
+hist(citydat0$人均使用面积,col = "darkolivegreen2",xlab = "面积值",ylab = "频数",main = "人均使用面积")
+hist(citydat0$户籍人口数量,col = "aquamarine",xlab = "人口数",ylab = "频数",main = "户籍人口数")
+hist(citydat0$商品房销售均价,col = "skyblue1",xlab = "面积值",ylab = "频数",main = "商品房销售均价")
+hist(citydat0$商品房销售面积,col = "cyan",xlab = "面积值",ylab = "频数",main = "商品房销售面积")
+hist(citydat0$商品房施工面积,col = "mediumpurple1",xlab = "面积值",ylab = "频数",main = "商品房施工面积")
+boxplot(citydat0[,2],col ="tomato",ylab="GPD值",main="城市GDP")
+boxplot(citydat0[,3],col = "goldenrod",ylab="收入值",main="人均可支配收入")
+boxplot(citydat0[,4],col = "khaki2",ylab="水平值",main="城市化水平")
+boxplot(citydat0[,5],col =  "darkolivegreen2",ylab="面积值",main="人均使用面积")
+boxplot(citydat0[,6],col = "aquamarine",ylab="人口数",main="户籍人口数")
+boxplot(citydat0[,7],col =  "skyblue1",ylab="价格",main="商品房销售均价")
+boxplot(citydat0[,8],col = "cyan",ylab="面积值",main="商品房销售面积")
+boxplot(citydat0[,9],col = "mediumpurple1",ylab="面积值",main="商品房施工面积")
+```
+
+
+
+##相关分析
+
+
+```{r}
+par(opar) #恢复初始绘图参数
+plot(citydat0[,-c(1)]) #绘制散点矩阵图
+```
+
+#计算数据集的相关系数矩阵并可视化
+```{r}
+mtcity = cor(citydat0[,-c(1)]) #计算相关系数
+corrgram::corrgram(mtcity,order = T,main="相关系数图") #绘制相关系数图
+par(opar)
+corrplot(mtcity,tl.col = "black") #相关系数可视化的图
+```
+
+
+
+##主成分分析
+
+
+```{r}
+pca.fit=princomp(citydat0[,-c(1)],cor = T) #使用princomp函数求解主成分
+```
+
+
+
+##结果分析
+
+首先确定需要几个主成分
+```{r}
+summary(pca.fit) #输出所有主成分的标准差（特征值开方）、方差贡献率、累计贡献率。
+```
+绘制碎石图，考虑保留2个主成分
+
+```{r}
+plot(pca.fit,type="lines",main="碎石图")
+```
+
+其次对主成分的含义进行解释
+
+
+```{r}
+pca.fit$loadings#输出全部主成分系数（特征向量），可以用于解释主成分的含义。
+cbind(round(pca.fit$loadings[,1:4],2))
+```
+输出前4个主成分的主成分系数
+
+```{r}
+pca.fit$loadings[,1]=pca.fit$loadings[,1]*(-1)
+pca.fit$loadings
+cbind(round(pca.fit$loadings[,1:4],2))
+```
+最后，利用主成分得分进行综合评价
+
+```{r}
+citydat0[,10:13]=pca.fit$scores[,1:4] #存储所有城市的前4个主成分得分
+names(citydat0)[10:13]=c("score1","score2","score3","score4") #变量重命名
+citydat0 #显示最后数据表
+```
+
+综合评价方法1：根据第一主成分得分进行综合排序
+
+```{r}
+pca.temp1=citydat0[order(citydat0$score1,decreasing = T),] #降序排列
+pca.temp1[1:3,] #综合表现最好的三个城市
+```
+
+综合评价法2：根据第一、第二主成分得分进行综合评价
+
+```{r}
+par(mfrow=c(1,2))
+plot(pca.fit$loadings[,1:2],main="观测变量的主成分系数",xlab = "第一主成分系数",ylab="第二主成分系数")
+text(pca.fit$loadings[,1:2],colnames(citydat0[,2:9]),cex=0.8,pos=1,col="red")
+plot(citydat0$score1,citydat0$score2,main = "样本点的主成分得分",xlab="第一主成分得分",ylab="第二主成分得分")
+text(citydat0$score1,citydat0$score2,citydat0$城市,cex = 0.8,pos = 3,col = "blue")
+```
+
+在一个图中显示
+
+```{r}
+par(mfrow=c(1,1))
+biplot(pca.fit)
+lines(c(-10,10),c(0,0))
+lines(c(0,0),c(-10,10))
+```
+
+
+
+
+
+
+
+

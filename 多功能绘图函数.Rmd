@@ -1,0 +1,196 @@
+---
+title: "多功能绘图函数"
+author: "Feng Yangyang"
+date: "2017年10月21日"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+## 定义函数
+
+```{r}
+#data:prefer a data frame or a vector of characters or numbers.
+#by:aggregate by this vector
+#type:which type of plot you want to make.
+#main:the mail title of your plot.
+#xlab:same as in plot.
+#ylab:same as in plot.
+#prob:in histplot,if you want a histplot with probability,set prob = TRUE
+#type you can input:scatterplot,barplot,histplot,boxplot,pie 
+intelPlot<-function(data,by = NULL,type = NULL,aggreFun = NULL,main = NULL,xlab = NULL,ylab = NULL,prob = FALSE,addlines = FALSE)
+{
+  if(!is.null(data) & is.null(by))
+  {
+    #数值型
+    if((class(data) == 'numeric') | (class(data) == 'integer'))
+    {
+      if(is.null(type))
+        hist(data,main = main,xlab = xlab,ylab = ylab)
+      ##hist plot
+      else if(type == 'histplot')
+      {
+        if(!addlines)
+        {
+          hist(data,main = main,xlab = xlab,ylab = ylab,probability = prob)
+        }
+        if(addlines)
+        {
+          hist(data,main = main,xlab = xlab,ylab = ylab,probability = TRUE)
+          lines(density(data))
+        }
+      }
+      ##scatter plot
+      else if(type == 'scatterplot')
+        plot(data,main = main,xlab = xlab,ylab =ylab)
+      #boxplot
+      else if(type == 'boxplot')
+        boxplot(data,main = main,xlab = xlab,ylab = ylab)
+      #茎叶图
+      else if(type == 'stem')
+        stem(data)
+    }
+    
+    #字符型或者因子型
+    if((class(data) == 'character') | (class(data) == 'factor'))
+    {
+      if(is.null(type))
+        barplot(table(data),main = main,xlab = xlab,ylab = ylab)
+      else if(type == 'barplot')
+        barplot(table(data),main = main,xlab = xlab,ylab = ylab)
+      else if(type == 'pie')
+        pie(table(data),main= main,xlab = xlab,ylab = ylab)
+    }
+  }
+  #此处传入两个向量
+  if(!is.null(data) & (!is.null(by)))
+  {
+    if(class(data) %in% c('numeric','integer') & 
+       class(by) %in% c('character','factor'))
+    {
+      #以by为列名，data为数据绘制柱状图,前提是by不重复
+      if(length(unique(by)) == length(by))
+        barplot(data,names.arg = by,main = main,xlab = xlab,ylab = ylab)
+      #by有重复值，则根据by列对data进行聚合运算，绘制柱状图
+      if(length(unique(by))!=length(by))
+      {
+        newD <- sapply(unique(by),function(x){
+          aggreFun(data[by==x])
+        })
+        barplot(newD,names.arg = unique(by), main = main,xlab = xlab,ylab = ylab)
+      }
+        
+    }
+    if(class(data) %in% c('numeric','integer') & 
+       class(by) %in% c('numeric','integer'))
+    {
+      if(type == 'scatterplot')
+        plot(data,by,main = main,xlab = xlab,ylab =ylab)
+      else if(type == 'line')
+        plot(data,by,type = 'l',main = main,xlab = xlab,ylab =ylab)
+     
+        
+    }
+    if(class(data) %in% c('numeric','integer') & 
+      class(by) == 'Date')
+    {
+      matplot(by,data,type = 'l',main = main,xlab = xlab,ylab = ylab) 
+    }
+  }
+}
+```
+##读取数据
+```{r}
+mpg<-read.csv('mpg.csv',sep = '\t')
+mpg<-mpg[mpg$horsepower!='?',]
+names(mpg)[1]='milePerGallon'
+mpg$cylinders<-as.factor(mpg$cylinders)
+mpg$model_year<-as.factor(mpg$model_year)
+mpg$origin<-as.factor(mpg$origin)
+attach(mpg)
+```
+
+## 函数实例
+### 1.data为数值型，默认绘制直方图
+```{r}
+attach(mpg)
+intelPlot(milePerGallon)
+```
+
+### 2.data为数值型，设置type=‘histplot’，也会绘制直方图
+```{r}
+intelPlot(milePerGallon,type = 'histplot')
+```
+
+### 3.data为数值型，设置type = 'histplot',prob = TRUE,绘制频率直方图
+```{r}
+intelPlot(milePerGallon,type = 'histplot',prob = TRUE)
+```
+
+### 4.data为数值型，设置type = 'histplot'，addlines = TRUE,为直方图添加密度曲线
+```{r}
+intelPlot(milePerGallon,type = 'histplot',addlines = TRUE)
+```
+
+### 5.data为数值型，设置type='boxplot',绘制箱线图
+```{r}
+intelPlot(milePerGallon,type = 'boxplot')
+```
+
+### 6.data为数值型，设置type='stem',绘制茎叶图
+```{r}
+intelPlot(milePerGallon,type = 'stem')
+```
+
+### 5.data为数值型，设置type='scatterplot'，绘制散点图
+```{r}
+intelPlot(milePerGallon,type = 'scatterplot')
+```
+
+### 7.data为字符型，设置type = 'barplot',绘制data的频数柱状图
+```{r}
+intelPlot(cylinders,type = 'barplot')
+```
+
+### 8.data为字符型，设置type = 'pie',绘制data的频数构成饼图
+```{r}
+intelPlot(cylinders,type = 'pie')
+```
+
+### 9.data为数值型，by为字符型，且by不重复，绘制柱状图
+```{r}
+testA <- c(2,4,6,7)
+classA <- c('A','B','C','D')
+intelPlot(data = testA,by = classA)
+```
+
+### 10.data为数值型，by为字符型，且by有重复值，绘制data关于by聚合的柱状图,aggrFun为聚合函数(mean,max,min,median...)
+```{r}
+intelPlot(milePerGallon,by = model_year,aggreFun = mean)
+```
+
+### 11.data为数值型，by为数值型，设置type = 'scatterplot'，绘制二维散点图
+```{r}
+testB <- c(2,4,6,8)
+intelPlot(testA,testA,type = 'scatterplot')
+```
+
+### 12.data为数值型数据，by为日期型数据，设置type = 'timeseries'，绘制时间序列图
+
+```{r}
+from <- as.Date('1970-01-01')
+timeseq <- seq(from = from,by = 1,length.out = 392)
+#saleQ <- runif(n = 392,min = 100,max = 150)
+intelPlot(data = milePerGallon,by = timeseq)
+```
+
+
+
+
+
+
+
+

@@ -1,0 +1,82 @@
+---
+title: "抽样第一次作业"
+author: "甘鹏程"
+date: "`r Sys.Date()`"
+output:
+  prettydoc::html_pretty:
+    theme: architect
+    highlight: github
+---
+
+##简单随机抽样
+```{r}
+setwd("C:/Users/h/Desktop/可视化数据集/2数据集二：Loan Data--Lending Club")
+mydata <- read.csv("LoanStats3C.csv",header = T,skip = 1)
+data0 <- na.omit(mydata[,'annual_inc'])
+N <- length(data0)
+data1 <- cut(data0,breaks = c(0,10000*(1:10),150000,100000*(2:5),max(data0)))
+PD <- table(data1)/N
+x=seq(6,20,by=0.1)
+y = 2^(x)
+plot(x,y)
+samp = round(y[-c(1:51)][-c(69:90)])
+n <- length(samp)
+Q <- rep(0,n)
+J <- NULL
+fun1 <- function(i) {
+  p<- sample(data0,i)
+  p<- c(p,matrix(NA,1,samp[n]-length(p)))
+  return(p)
+}
+samp <- as.matrix(samp)
+ma <- apply(samp,1,fun1)
+fun2 <- function(datasam1){
+   datasam11 <- cut(na.omit(datasam1),breaks = c(0,10000*(1:10),150000,100000*(2:5),max(data0)))
+   PS <- table(datasam11)/length(na.omit(datasam1)) + 0.0000000001
+   J = rep(0,16)
+   for (i in 1:16){
+     J[i] <- (PS[i]-PD[i])*(log(PS[i]/PD[i]))
+   }
+   JJ <- sum(J)
+   q <- exp(-JJ)
+   return(q)
+}
+Q1 <- apply(ma,2,fun2)
+plot(samp,Q1,main = "简单随机抽样结果",xlab = "样本容量",ylab = "样本质量")
+```
+
+##分层抽样
+
+```{r}
+str <- length(levels(data1))
+data2 <- cbind(data0,data1)
+fun3 <- function(s){
+  p <- NULL
+  for(j in 1:str){
+    samp2 <- NULL
+    samp2 <- sample((1:N)[data2[,2] == j],round(s*PD[j]))
+    p <- c(p,samp2)
+  }
+  res <- c(data0[p],matrix(NA,1,samp[n]+5-length(p)))
+  return(res)
+}
+mb <- apply(samp,1,fun3)
+Q2 <- apply(mb,2,fun2)
+plot(samp,Q2,main = "分层抽样结果",xlab = "样本容量",ylab = "样本质量")
+```
+
+##对比图
+
+```{r}
+type1 <- rep("random",68)
+Q1 <- data.frame(Q1,type1,samp)
+colnames(Q1) <- c("point","type","volume")
+type2 <- rep("group",68)
+Q2 <- data.frame(Q2,type2,samp)
+colnames(Q2) <- c("point","type","volume")
+ctr <- rbind(Q1,Q2)
+attach(ctr)
+type <- as.factor(type)
+library(ggplot2)
+ggplot(data = ctr,aes(x=volume,y=point,colour=type,shape=type))+geom_point()
+```

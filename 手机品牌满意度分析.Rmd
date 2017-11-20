@@ -1,0 +1,208 @@
+---
+title: "不同品牌手机使用评价数据分析报告"
+author: "S.st"
+date: "2017年10月8日"
+output: html_document
+---
+# 人口学特征描述
+
+```{r}
+library(rJava)
+library(xlsxjars)
+library(xlsx)
+setwd("C:/Users/h/Desktop/［探索性数据分析］第三讲 课件＋作业")
+mydata <- read.xlsx("手机问卷数据.xls",4,encoding = "UTF-8")
+mydata_year <- mydata[,31]
+mydata_prof <- mydata[,32]
+mydata_edu <- mydata[,33]
+mydata_user <- mydata[,34]
+mydata_user <- as.vector(mydata_user)
+mydata_year[is.na(mydata_year)] <- 0
+mydata_prof[is.na(mydata_prof)] <- 0
+mydata_edu[is.na(mydata_edu)] <- 0
+year <- as.data.frame(table(mydata_year))
+pcty <- round(year[,2]/sum(year[,2])*100)
+year[,1] <- c("未填写","18-25岁","26-30岁","31-35岁")
+laby <- paste(year[,1]," ",pcty,"%",sep = "")
+library(plotrix)
+pie(year[,2],labels = laby,col = rainbow(10,alpha = 0.2)[c(7,3,4,1)],main = "年龄分布饼图")
+prof <- as.data.frame(table(mydata_prof))
+pcty <- round(prof[,2]/sum(prof[,2])*100)
+prof[,1] <- c("未填写","理科","工科","人文艺术","经管","其他")
+labp <- paste(prof[,1]," ",pcty,"%",sep = "")
+pie(prof[,2],labels = labp,col = rainbow(10,alpha = 0.2)[c(2,7,1,4,3,10)],main = "专业分布饼图")
+
+edu <- as.data.frame(table(mydata_edu))
+edu <- edu[-5,]
+pcty <- round(edu[,2]/sum(edu[,2])*100)
+edu[,1] <- c("未填写","中专及以下","本科","硕士及以上")
+labe <- paste(edu[,1]," ",pcty,"%",sep = "")
+pie(edu[,2],labels = labe,col = rainbow(10,alpha = 0.2)[c(2,7,1,4)],main = "学历分布饼图")
+library(wordcloud2)
+wordcloud2(table(mydata_user),shape = 'diamond', size = 1.5)
+```
+
+# 变量值分布情况
+
+
+```{r }
+library(grid)
+mydata2 <- mydata[,-c(1,2,31,32,33,34)]
+mydata3 <- unlist(mydata2)
+class(mydata3)
+table(mydata3)
+mydata2[mydata2 == 45] <- 5
+mydata2[mydata2 == 55] <- 5
+mydata2[mydata2 == 8] <- 4
+mydata2[mydata2 == 71] <- 4
+mydata2[is.na(mydata2)]
+mydata2 <- na.omit(mydata2)
+mydata3 <- unlist(mydata2)
+x <- names(table(mydata3))
+y <- as.numeric(table(mydata3))
+lbls <- round(y/sum(y)*100)
+lbls <- paste(lbls,"%",sep = "")
+lbls <- paste(x," ",lbls)
+barplot(table(mydata3),col = heat.colors(10,alpha = 0.5)[c(10,9,7,4,2,3,5)],main = "所有回答得分条形图",xlab = "问题得分",ylab = "频数")
+legend(0.5,3300,lbls,fill =heat.colors(10,alpha = 0.5)[c(10,9,7,4,2,3,5)])
+mydata4 <- mydata[,-c(31,32,33,34)]
+mydata4 <- na.omit(mydata4)
+mydata4[mydata4 == 45] <- 5
+mydata4[mydata4 == 8] <- 4
+mydata4[mydata4 == 55] <- 5
+mydata4[mydata4 == 71] <- 4
+san <- subset(mydata4,brand ==2,select = q1:q28)
+iphone <- subset(mydata4,brand == 4,select = q1:q28)
+htc <- subset(mydata4,brand == 6,select = q1:q28)
+huawei <- subset(mydata4,brand == 7,select = q1:q28)
+san <- unlist(san)
+iphone <- unlist(iphone)
+htc <- unlist(htc)
+huawei <- unlist(huawei)
+san <- as.numeric(table(san))
+iphone <- as.numeric(table(iphone))
+htc <- as.numeric(table(htc))
+huawei <- as.numeric(table(huawei))
+counts <- data.frame(san,iphone,htc,huawei)
+counts <- t(counts)
+colnames(counts) <- c("1","2","3","4","5","6","7")
+rownames(counts)<- c("三星","苹果","HTC","华为")
+library(vcd)
+library(grid)
+barplot(counts,main="四个品牌评分分布堆砌条形图",xlab="回答评分",ylab ="频数",col=rainbow(10,alpha = 0.2)[c(7,9,4,1)],beside=TRUE)
+legend(1,800,rownames(counts),fill = rainbow(10,alpha = 0.2)[c(7,9,4,1)])
+spine(counts,main = "四个品牌的回答评分分布图",xlab = "四个手机品牌")
+
+```
+
+# 变量相关性分析
+
+
+```{r}
+library(psych)
+library(car)
+library(corrplot)
+library(corrgram)
+corr <- cor(mydata2)
+corrplot(corr,method = "square")
+```
+
+# 因子分析建模，驱动因素构造
+
+
+```{r}
+par(mfrow=c(1,1))
+fa.parallel(mydata2[,-c(23,24,25,26,27,28)],fa="fa",main = "碎石图",show.legend=FALSE)
+legend("topright",inset = .05,title = "类型",c("拟合线","对比线","参考线"),lty=c(1,2,1),col=c("blue","red","black"))
+fa2 = fa(mydata2[,-c(23,24,25,26,27,28)],nfactors = 3,rotate = "varimax",fm="pa")
+fa2$communality
+commu <- fa2$communality
+barplot(commu,col = rainbow(10,alpha = 0.2)[7],xlab = "所有变量",ylab="共同度",main="变量共同度柱状图")
+fa3 = fa(mydata2[,-c(6,7,10,17,18,19,23,24,25,26,27,28)],nfactors = 3,rotate = "varimax",fm="pa")
+fa3
+scores <- fa3$scores
+head(scores)
+weights <- fa3$weights
+head(weights)
+loadings <- fa3$loadings
+```
+
+# 回归分析准备，结果因素构建
+
+```{r}
+all <- cbind(mydata4[,c(1,2)],scores)
+honor <- (mydata4[,25]+mydata4[,26]+mydata4[,27])/3
+loa <- (mydata4[,28]+mydata4[,29]+mydata4[,30])/3
+all <- cbind(all,honor)
+all <- cbind(all,loa)
+all_san <- subset(all,brand==2)
+all_iphone <- subset(all,brand==4)
+all_htc <- subset(all,brand==6)
+all_hw <- subset(all,brand==7)
+boxplot(all_san[,3],all_iphone[,3],all_htc[,3],all_hw[,3],names = c("三星","苹果","HTC","华为"),xlab ="品牌",ylab="象征价值得分",main="各品牌的因子得分(a)",col = rainbow(10,alpha = 0.2)[c(7,9,4,1)])
+boxplot(all_san[,4],all_iphone[,4],all_htc[,4],all_hw[,4],names = c("三星","苹果","HTC","华为"),xlab ="品牌",ylab="用户体验得分",main="各品牌的因子得分(b)",col = rainbow(10,alpha = 0.2)[c(7,9,4,1)])
+boxplot(all_san[,5],all_iphone[,5],all_htc[,5],all_hw[,5],names = c("三星","苹果","HTC","华为"),xlab ="品牌",ylab="性价比得分",main="各品牌的因子得分(c)",col = rainbow(10,alpha = 0.2)[c(7,9,4,1)])
+library(ggradar)
+library(ggplot2)
+san_ave <- c(mean(all_san[,3]),mean(all_san[,4]),mean(all_san[,5]))
+iphone_ave <- c(mean(all_iphone[,3]),mean(all_iphone[,4]),mean(all_iphone[,5]))
+htc_ave <- c(mean(all_htc[,3]),mean(all_htc[,4]),mean(all_htc[,5]))
+hw_ave <- c(mean(all_hw[,3]),mean(all_hw[,4]),mean(all_hw[,5]))
+radar <- cbind(san_ave,iphone_ave,htc_ave,hw_ave)
+colnames(radar) <- c("三星","苹果","HTC","华为")
+rownames(radar) <- c("象征价值","用户体验","性价比")
+myradar <- data.frame(radar)
+myradar <- t(myradar)
+Names <- c("三星","苹果","HTC","华为")
+myradar <- data.frame(Names,myradar)
+ggradar(myradar, grid.min = -0.7, grid.mid = 0, grid.max = 0.7,plot.extent.x.sf = 1.2,plot.extent.y.sf = 1.2)
+```
+
+# #回归函数拟合
+
+```{r}
+library(lmPerm)
+fit <- lmp(all$honor~all$PA1+all$PA2+all$PA3,data = all,perm = "Prob")
+fit2 <- lmp(all$loa~all$PA1+all$PA2+all$PA3,data = all,perm = "Prob")
+fit
+summary(fit)
+fit_san <- lmp(all_san$honor~all_san$PA1+all_san$PA2+all_san$PA3,data = all_san,perm = "Prob")
+fit_iphone <- lmp(all_iphone$honor~all_iphone$PA1+all_iphone$PA2+all_iphone$PA3,data = all_iphone,perm = "Prob")
+fit_htc <- lmp(all_htc$honor~all_htc$PA1+all_htc$PA2+all_htc$PA3,data = all_htc,perm = "Prob")
+fit_hw <- lmp(all_hw$honor~all_hw$PA1+all_hw$PA2+all_hw$PA3,data = all_hw,perm = "Prob")
+fit_san2 <- lmp(all_san$loa~all_san$PA1+all_san$PA2+all_san$PA3,data = all_san,perm = "Prob")
+fit_iphone2 <- lmp(all_iphone$loa~all_iphone$PA1+all_iphone$PA2+all_iphone$PA3,data = all_iphone,perm = "Prob")
+fit_htc2 <- lmp(all_htc$loa~all_htc$PA1+all_htc$PA2+all_htc$PA3,data = all_htc,perm = "Prob")
+fit_hw2 <- lmp(all_hw$loa~all_hw$PA1+all_hw$PA2+all_hw$PA3,data = all_hw,perm = "Prob")
+fit_san
+fit_san2
+fit_iphone
+fit_iphone2
+fit_htc
+fit_htc2
+fit_hw
+fit_hw2
+goal = all[,-c(3,4,5)]
+goal$brand = factor(goal$brand,levels = c(2,4,6,7),labels = c("三星","苹果","HTC","华为"))
+par(mfrow=c(1,2))
+boxplot(goal$honor~goal$brand,data=goal,col=rainbow(10,alpha = 0.2)[c(7,9,4,1)],ylab="得分",main="满意度")
+boxplot(goal$loa~goal$brand,data=goal,col=rainbow(10,alpha = 0.2)[c(7,9,4,1)],ylab="得分",main="忠诚度")
+par(mfrow=c(1,1))
+```
+
+# 因子得分投影图
+
+
+```{r}
+library(scatterplot3d)
+ABCD = data.frame(group=as.factor(all[,2]),pa1=all[,4],pa2=all[,3],pa3=all[,5])
+library(lattice)
+keys <- list(title="品牌",space="right",columns=1,text=list(c("三星","苹果","HTC","华为")),points=list(pch=c(15,17,19,8),col=rainbow(10,alpha = 0.5)[c(7,9,4,1)]))
+cloud(pa1~pa2*pa3,data = ABCD,allow.multiple = TRUE,col =rainbow(10,alpha = 0.5)[c(7,9,4,1)],groups = ABCD$group,xlab = "用户体验",ylab = "性价比",zlab ="象征价值",main="各品牌因子得分三维散点图",pch=c(15,17,19,8),type = "p",key=keys)
+```
+
+
+
+
+
+
